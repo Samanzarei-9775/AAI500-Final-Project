@@ -29,9 +29,7 @@
     * `High School: 0`, `Bachelor's: 1`, `Master's: 2`, `PhD: 3`
   * `Industry`: Nominal categorical feature one-hot encoded with `drop_first=True`, explicitly designating **`IT`** as the dropped reference baseline to anchor regression odds ratios ($\exp(\beta)$). Indicator features represent contrasts against the tech benchmark:
     * `Industry_Education`, `Industry_Finance`, `Industry_Healthcare`, `Industry_Logistics`, `Industry_Manufacturing`, `Industry_Retail`, `Industry_Telecom`
-* **Engineered & Domain Indices:**
-  * `Automation_Ratio`: Evaluates task exposure by comparing routine task burden relative to creativity requirements.
-  * `Shield_Index`: Evaluates how human interaction levels and professional tenure amplify protection against displacement.
+
 
 ---
 
