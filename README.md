@@ -42,9 +42,8 @@
   * Career tenure domain sanity constraint enforced: $(\text{Age} - \text{Years of Experience}) \ge 16$, validating that no career history reflects commencement prior to standard legal working age.
   * Comprehensive null audit confirms zero missing values across all 20,000 observations.
 * **Stratified 3-Way Data Partitioning:**
-  * **Training Set:** 70% ($N = 14,000$)
-  * **Validation Set:** 15% ($N = 3,000$)
-  * **Test Set:** 15% ($N = 3,000$)
+  * **Training Set:** 70% ($N = 16,000$)
+  * **Test Set:** 15% ($N = 4,000$)
   * Stratification preserves identical target class distribution across all three splits (~33% Low, ~33% Medium, ~34% High).
 * **Leakage-Free Feature Scaling:**
   * `StandardScaler` is fitted **strictly on `X_train`** ($\mu_{\text{train}}, \sigma_{\text{train}}$) and applied downstream to transform validation and test sets, maintaining complete out-of-sample data isolation.
