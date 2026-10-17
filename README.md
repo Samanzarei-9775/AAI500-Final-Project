@@ -11,7 +11,7 @@
 ### 1. Project Scope & Research Question
 
 * **Title:** *Predicting Workforce Volatility: An Executive Framework for AI-Driven Layoff Risk*
-* **Core Research Question:** *"What is an employee's risk of layoff based on their years of experience, age, education level, and industry?"*
+* **Core Research Question:** *"What is an employee's risk of layoff based on their industry sector, career tenure, routine task percentage, tasks automated percentage, and AI tooling adoption?"*
 * **Target Variable ($y$):** `Layoff_Risk` modeled as an ordinal multi-class outcome:
   * `0`: **Low Risk**
   * `1`: **Medium Risk**
@@ -22,63 +22,70 @@
 
 ### 2. Feature Architecture
 
-* **Core Predictors ($X$):**
-  * `Age`: Continuous numerical variable ($z$-score standardized).
-  * `Years_of_Experience`: Continuous numerical variable ($z$-score standardized).
-  * `Education_Level`: Ordinal integer encoding capturing credentialing hierarchy:
-    * `High School: 0`, `Bachelor's: 1`, `Master's: 2`, `PhD: 3`
-  * `Industry`: Nominal categorical feature one-hot encoded with `drop_first=True`, explicitly designating **`IT`** as the dropped reference baseline to anchor regression odds ratios ($\exp(\beta)$). Indicator features represent contrasts against the tech benchmark:
+Transitioning from demographic indicators to workload- and automation-centric features provides direct empirical separation across risk tiers:
+
+* **Selected Predictors ($X$ $\to$ 11 Model Features):**
+  * `Industry`: Nominal categorical feature one-hot encoded with `drop_first=True`, explicitly designating **`IT`** as the dropped reference baseline to anchor regression odds ratios ($\exp(\beta)$). Generates 7 indicator columns representing contrasts against the tech benchmark:
     * `Industry_Education`, `Industry_Finance`, `Industry_Healthcare`, `Industry_Logistics`, `Industry_Manufacturing`, `Industry_Retail`, `Industry_Telecom`
-* **Engineered & Domain Indices:**
-  * `Automation_Ratio`: Evaluates task exposure by comparing routine task burden relative to creativity requirements.
-  * `Shield_Index`: Evaluates how human interaction levels and professional tenure amplify protection against displacement.
+  * `Years_of_Experience`: Continuous numerical variable ($z$-score standardized).
+  * `Routine_Task_Percentage`: Continuous percentage variable [0, 100] capturing task repetitiveness ($z$-score standardized).
+  * `Tasks_Automated_Percentage`: Continuous percentage variable [0, 100] measuring existing workflow automation ($z$-score standardized).
+  * `Number_of_AI_Tools_Used`: Discrete integer count [0, 10] reflecting employee-level AI integration ($z$-score standardized).
 
 ---
 
 ### 3. Data Preprocessing & Validation Pipeline
 
 * **Integrity & Sanity Audits:**
-  * Deduplication verification confirms zero redundant employee records.
+  * Deduplication verification confirms zero redundant employee records across the 20,000 observations.
   * Career tenure domain sanity constraint enforced: $(\text{Age} - \text{Years of Experience}) \ge 16$, validating that no career history reflects commencement prior to standard legal working age.
-  * Comprehensive null audit confirms zero missing values across all 20,000 observations.
-* **Stratified 3-Way Data Partitioning:**
-  * **Training Set:** 70% ($N = 16,000$)
-  * **Test Set:** 15% ($N = 4,000$)
-  * Stratification preserves identical target class distribution across all three splits (~33% Low, ~33% Medium, ~34% High).
+  * Comprehensive null audit confirms zero missing values across all columns.
+  * Numeric range audit confirms all percentage predictors lie strictly within [0, 100] and counts are non-negative.
+* **Stratified 2-Way Holdout Data Partitioning (80/20 Split):**
+  * **Training Set:** 80% ($N = 16,000$ records $\times$ 11 predictors)
+  * **Testing Set:** 20% ($N = 4,000$ records $\times$ 11 predictors)
+  * Stratification preserves identical target class distribution across both partitions (~33.0% Low, ~33.0% Medium, ~34.0% High).
 * **Leakage-Free Feature Scaling:**
-  * `StandardScaler` is fitted **strictly on `X_train`** ($\mu_{\text{train}}, \sigma_{\text{train}}$) and applied downstream to transform validation and test sets, maintaining complete out-of-sample data isolation.
+  * `StandardScaler` is fitted **strictly on `X_train`** ($\mu_{\text{train}}, \sigma_{\text{train}}$) and applied downstream to transform `X_test`, maintaining complete out-of-sample data isolation. One-hot dummy columns remain intact as unscaled binary indicators.
 * **Processed Data Artifacts:**
-  * All 6 partitioned and standardized modeling sets are exported to the [`Data/`](file:///c:/Users/19496/OneDrive/Desktop/MSAAI/AntiGravity%20Final%20Proejct/AAI500-Final-Project/Data) directory (`processed_X_train.csv`, `processed_X_val.csv`, `processed_X_test.csv`, `processed_y_train.csv`, `processed_y_val.csv`, `processed_y_test.csv`).
+  * Partitioned and standardized modeling sets are exported to the [`Data/`](file:///c:/Users/19496/OneDrive/Desktop/MSAAI/AntiGravity%20Final%20Proejct/AAI500-Final-Project/Data) directory:
+    * `processed_X_train.csv` (16,000 $\times$ 11) & `processed_y_train.csv` (16,000 $\times$ 1)
+    * `processed_X_test.csv` (4,000 $\times$ 11) & `processed_y_test.csv` (4,000 $\times$ 1)
 
 ---
 
 ### 4. Analytical Exploratory Data Analysis (EDA) Highlights
 
-Exploratory analyses conducted strictly on the training partition ($N = 14,000$, zero data leakage) reveal four core empirical takeaways:
+Exploratory analyses conducted strictly on the training partition ($N = 16,000$, zero data leakage) reveal four core empirical takeaways:
 
-1. **Seniority and Career Tenure Buffering:**
-   * Employee age is invariant across risk categories (median 40.0–41.0 years), indicating that chronological age alone is not a primary driver of vulnerability.
-   * Career tenure demonstrates a clear protective effect: workers classified as **High Layoff Risk** possess a median of **6.0 years of experience**, compared to **7.0 years** for Medium Risk and **8.0 years** for Low Risk employees.
-2. **Credentialing Protective Gradient:**
-   * Educational attainment exhibits an inverse monotonic relationship with layoff vulnerability. High School educated workers face **45.2% High Risk** (vs. 22.5% Low Risk), whereas PhD holders experience only **20.0% High Risk** (and **49.6% Low Risk**). Advanced degrees more than halve high-risk exposure.
+1. **Routine Work and Automation Exposure Dominate Risk Separation:**
+   * Median **routine task share** climbs sharply from **26.0%** (Low Risk) to **50.0%** (Medium) and **77.0%** (High).
+   * Median **tasks automated** follows the same trajectory (**17.0% $\to$ 34.0% $\to$ 55.0%**). These two features provide near-complete separation between the extreme risk tiers.
+2. **AI Tooling Adoption Threshold Effect:**
+   * Workers utilizing **0–1 AI tools** are ~56% Low Risk and <10% High Risk.
+   * At **3 tools**, High Risk jumps abruptly to **58.6%**, expanding to **74.9% at 6 tools** and **83.7% at 10 tools**. The non-linear step-function strongly benefits non-parametric tree ensembles.
 3. **Sector Volatility Disparity Relative to Baseline IT:**
-   * Operational and supply-chain sectors exhibit the highest vulnerability: **Manufacturing (48.2% High Risk)**, **Retail (42.3%)**, and **Logistics (40.9%)**.
-   * Essential human services demonstrate superior resilience: **Healthcare (20.6% High Risk)** and **Education (20.0% High Risk)**.
-   * The regression reference baseline, **IT (27.4% High Risk)**, occupies an optimal intermediate position to capture both risk premiums and discounts.
-4. **Collinearity Diagnostic Verification:**
-   * Pearson correlation between continuous predictors `Age` and `Years_of_Experience` is $r = 0.384$, well below the conventional diagnostic threshold ($|r| < 0.80$).
-   * `Education_Level` exhibits virtually zero correlation with age ($r = 0.002$) and tenure ($r = -0.001$), confirming the absence of harmful multicollinearity for subsequent regression modeling.
+   * Operational and supply-chain intensive sectors exhibit elevated risk: **Manufacturing (48.2% High Risk)**, **Retail (41.7%)**, and **Logistics (40.9%)**.
+   * Essential human services demonstrate superior stability: **Education (19.9% High Risk)** and **Healthcare (21.0% High Risk)**.
+   * The reference baseline, **IT (27.8% High Risk)**, occupies an optimal intermediate position to capture both risk premiums and discounts.
+4. **Career Tenure Buffering & Multicollinearity Diagnostics:**
+   * Career tenure provides a modest protective buffer: median experience declines from **8.0 years** (Low Risk) to **7.0 years** (Medium) and **6.0 years** (High).
+   * `Routine_Task_Percentage` and `Tasks_Automated_Percentage` are strongly correlated ($r = 0.889$, Variance Inflation Factors $\text{VIF} \approx 5.6$ and $4.8$). In tree ensembles, splits are shared between them; in Naïve Bayes, this tests the conditional independence assumption.
 
 ---
 
-### 5. Benchmarking Model Suite
+### 5. Benchmarking Model Suite & Test Performance
 
-A 4-model suite balancing statistical inference, interpretability, and predictive performance:
+A 4-model suite balancing statistical inference, interpretability, and predictive performance evaluated on the holdout **Test Set ($N = 4,000$, 20%)**:
 
-1. **Multinomial Logistic Regression:** Primary parametric baseline calculating parameter coefficients ($\beta$), $p$-values, confidence intervals, and explicit **Odds Ratios ($e^\beta$)** relative to IT.
-2. **Gaussian Naïve Bayes:** Diagnostic probabilistic baseline evaluating conditional independence assumptions on mixed workforce attributes.
-3. **Random Forest Classifier:** Non-parametric ensemble bagging model capturing non-linear tenure/education interactions and Gini feature importances.
-4. **Gradient Boosting Classifier (XGBoost):** Ensemble boosting model optimizing multi-class log-loss, Macro F1-score, and SHAP explainability.
+| Model | Test Accuracy | Macro Sensitivity (Recall) | Macro Specificity (TNR) | Generalization Gap (Train − Test) | Primary Role & Strength |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Gradient Boosting (GB)** | **74.95%** | **0.7486** | **0.8748** | **+1.33%** | **Top Predictor:** Captures non-linear thresholds; high sensitivity on extreme tiers (83.5% High, 80.0% Low). |
+| **Random Forest (RF)** | **74.88%** | **0.7482** | **0.8744** | **+2.45%** | **Bagging Ensemble:** Robust non-parametric baseline with Gini feature importance validation. |
+| **Gaussian Naïve Bayes (NB)** | **73.35%** | **0.7328** | **0.8669** | **−1.04%** | **Probabilistic Baseline:** Fast generative classifier; highest Low-Risk recall (**86.59%**). |
+| **Multinomial Logistic Regression (LR)** | **71.70%** | **0.7158** | **0.8585** | **+0.10%** | **Parametric Inference:** Provides interpretable parameter coefficients ($\beta$) and Odds Ratios ($e^\beta$) relative to IT. |
+
+*Majority-Class Baseline Accuracy on Test Set:* **34.00%**. All four models outperform the naive baseline by **37–41 percentage points**.
 
 ---
 
@@ -88,49 +95,62 @@ A 4-model suite balancing statistical inference, interpretability, and predictiv
 AAI500-Final-Project/
 │
 ├── Data/
-│   ├── Raw-AI-Dataset.csv             # Raw 20,000-record dataset
-│   ├── processed_X_train.csv          # Scaled training predictors (14,000 x 10)
-│   ├── processed_X_val.csv            # Scaled validation predictors (3,000 x 10)
-│   ├── processed_X_test.csv           # Scaled test predictors (3,000 x 10)
-│   ├── processed_y_train.csv          # Training target labels (14,000 x 1)
-│   ├── processed_y_val.csv            # Validation target labels (3,000 x 1)
-│   └── processed_y_test.csv           # Test target labels (3,000 x 1)
+│   ├── Raw-AI-Dataset.csv                 # Raw 20,000-record dataset
+│   ├── processed_X_train.csv              # Scaled training predictors (16,000 x 11)
+│   ├── processed_X_test.csv               # Scaled holdout test predictors (4,000 x 11)
+│   ├── processed_y_train.csv              # Training target labels (16,000 x 1)
+│   └── processed_y_test.csv               # Holdout test target labels (4,000 x 1)
 │
 ├── notebooks/
-│   ├── data_cleaning_merged.ipynb     # Master end-to-end data cleaning, encoding, splitting, and Section 3 EDA
-│   ├── Data-Cleaning.ipynb            # Team member data cleaning notebook
-│   ├── data_cleaning_Saman_Version.ipynb # Alternative team cleaning reference
-│   └── Final_Project_Appendix.ipynb   # Technical report code appendix
+│   ├── data_cleaning_merged.ipynb         # Master data cleaning, encoding, 80/20 splitting, and Section 3 EDA
+│   ├── Training_models_merged.ipynb       # Master multi-model notebook benchmarking LR, RF, GB, and NB
+│   ├── data_training_Mustafa_GB.ipynb     # Dedicated Gradient Boosting model training & evaluation (Mustafa)
+│   ├── data_training_Mustafa_NB.ipynb     # Dedicated Gaussian Naïve Bayes model training & evaluation (Mustafa)
+│   ├── data_training_Saman_LR.ipynb       # Dedicated Multinomial Logistic Regression notebook (Saman)
+│   ├── data_training_Saman_RF.ipynb       # Dedicated Random Forest classifier notebook (Saman)
+│   ├── Data-Cleaning.ipynb                # Team data cleaning reference notebook
+│   └── data_cleaning_Saman_Version.ipynb  # Alternative cleaning reference notebook
 │
-└── README.md                          # Project documentation and executive summary
+├── .gitignore                             # Ignores virtual environments (.venv) and checkpoints
+└── README.md                              # Comprehensive project documentation and executive summary
 ```
 
 ---
 
 ### 7. Execution & Reproduction Guide
 
-To run the data cleaning, splitting, and analytical EDA pipeline end-to-end:
+To reproduce the data cleaning and model benchmarking pipeline end-to-end:
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/Samanzarei-9775/AAI500-Final-Project.git
 cd AAI500-Final-Project
 
-# Install required dependencies
-pip install numpy pandas scikit-learn matplotlib seaborn statsmodels
+# 2. Set up virtual environment and install dependencies
+python -m venv .venv
+source .venv/bin/activate        # On Linux/macOS
+# .\.venv\Scripts\Activate.ps1   # On Windows PowerShell
 
-# Launch Jupyter Notebook
-jupyter notebook notebooks/data_cleaning_merged.ipynb
+pip install numpy pandas scikit-learn matplotlib seaborn statsmodels jupyter
+
+# 3. Execute master cleaning and splitting pipeline
+jupyter nbconvert --to notebook --execute --inplace notebooks/data_cleaning_merged.ipynb
+
+# 4. Execute master multi-model training pipeline
+jupyter nbconvert --to notebook --execute --inplace notebooks/Training_models_merged.ipynb
 ```
 
-Execute all cells sequentially (`Kernel -> Restart & Run All`). The notebook executes in ~5 seconds, renders all figures inline, outputs statistical tables, and exports the six modeling partitions to the `Data/` directory.
+Each notebook includes an automated self-installing environment setup cell at index 0 to ensure immediate execution in any Jupyter/VS Code kernel.
 
 ---
 
-### 8. Next Steps & Active Milestones
+### 8. Project Milestones & Deliverables Status
 
-* [ ] Fit baseline models (Logistic Regression, Gaussian Naïve Bayes) and extract Odds Ratio summary tables.
-* [ ] Train ensemble models (Random Forest, Gradient Boosting) and tune hyperparameters on `X_val`.
-* [ ] Evaluate final test metrics (`Accuracy`, `Macro F1`, `One-vs-Rest ROC-AUC`) on `X_test`.
-* [ ] Assemble Sections 1–6 of the PDF Technical Report and finalize the executed Jupyter Notebook appendix.
-* [ ] Record the 8–10 minute executive presentation video with equal team distribution.
+* [x] Audit raw dataset integrity (duplicates, nulls, tenure domain constraint).
+* [x] Implement 5-feature architecture (`Industry`, `Years_of_Experience`, `Routine_Task_Percentage`, `Tasks_Automated_Percentage`, `Number_of_AI_Tools_Used`).
+* [x] Establish zero-leakage 80/20 stratified partitioning ($N = 16,000$ train / $N = 4,000$ test).
+* [x] Conduct analytical EDA strictly on the training partition.
+* [x] Train and benchmark full 4-model suite (Logistic Regression, Random Forest, Gradient Boosting, Gaussian Naïve Bayes).
+* [x] Consolidate multi-model training into [`Training_models_merged.ipynb`](file:///c:/Users/19496/OneDrive/Desktop/MSAAI/AntiGravity%20Final%20Proejct/AAI500-Final-Project/notebooks/Training_models_merged.ipynb).
+* [ ] Finalize executive presentation slides and recording.
+* [ ] Compile final academic PDF technical report.
